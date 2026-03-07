@@ -23,7 +23,7 @@ h1, h2, h3, p, a {
 
 /* Hero Section*/
 .hero{
-	background-image:url("img/background-image.png");
+	background-image:url("../img/background-image.png");
 	background-repeat:no-repeat;
 	background-position:center;
 	background-size:cover;
@@ -1362,4 +1362,5 @@ h2.title:after{
   padding: 14px 36px;
   font-size: 1.6rem;
   font-weight: 600;
+
 }
