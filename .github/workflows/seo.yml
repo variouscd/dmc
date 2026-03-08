@@ -33,13 +33,19 @@ jobs:
 
       - name: Generate sitemap pages
         run: |
-
           DOMAIN="https://dmc.variouscd.com"
 
           mkdir -p seo
 
           echo '<?xml version="1.0" encoding="UTF-8"?>' > seo/sitemap-pages.xml
           echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> seo/sitemap-pages.xml
+
+          echo "<url>" >> seo/sitemap-pages.xml
+          echo "<loc>${DOMAIN}/</loc>" >> seo/sitemap-pages.xml
+          echo "<lastmod>$(date +%F)</lastmod>" >> seo/sitemap-pages.xml
+          echo "<changefreq>daily</changefreq>" >> seo/sitemap-pages.xml
+          echo "<priority>1.0</priority>" >> seo/sitemap-pages.xml
+          echo "</url>" >> seo/sitemap-pages.xml
 
           find . -type f -name "*.html" \
           -not -path "./.github/*" \
@@ -49,7 +55,8 @@ jobs:
           -not -name "404.html" \
           | sort -u | while read file; do
 
-            url=$(echo "$file" | sed 's|^\./||' | sed 's|index.html||')
+            url=$(echo "$file" | sed 's|^\./||')
+            url=$(echo "$url" | sed 's|index.html||')
             url=$(echo "$url" | sed 's|//|/|g')
 
             if [ -z "$url" ]; then
@@ -57,7 +64,6 @@ jobs:
             fi
 
             loc="${DOMAIN}/${url}"
-
             loc=$(echo "$loc" | sed 's|://|TEMP|g' | sed 's|//|/|g' | sed 's|TEMP|://|g')
 
             LASTMOD=$(git log -1 --format="%cI" "$file" | cut -d'T' -f1)
@@ -66,10 +72,12 @@ jobs:
               LASTMOD=$(date +%F)
             fi
 
-            if [ "$url" = "" ]; then
-              PRIORITY="1.0"
-              CHANGEFREQ="daily"
-            elif [[ "$url" == */ ]]; then
+            DEPTH=$(echo "$url" | awk -F"/" '{print NF}')
+
+            if [ "$DEPTH" -le 2 ]; then
+              PRIORITY="0.9"
+              CHANGEFREQ="weekly"
+            elif [ "$DEPTH" -le 3 ]; then
               PRIORITY="0.8"
               CHANGEFREQ="weekly"
             else
@@ -88,6 +96,8 @@ jobs:
 
           echo "</urlset>" >> seo/sitemap-pages.xml
 
+          sort -u seo/sitemap-pages.xml -o seo/sitemap-pages.xml
+
       - name: Validate XML sitemap
         run: |
           xmlstarlet val -e seo/sitemap-pages.xml
@@ -98,14 +108,13 @@ jobs:
 
       - name: Create sitemap index
         run: |
-
           DOMAIN="https://dmc.variouscd.com"
 
           echo '<?xml version="1.0" encoding="UTF-8"?>' > sitemap.xml
           echo '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> sitemap.xml
 
           echo "<sitemap>" >> sitemap.xml
-          echo "<loc>${DOMAIN}/seo/sitemap-pages.xml.gz</loc>" >> sitemap.xml
+          echo "<loc>${DOMAIN}/seo/sitemap-pages.xml</loc>" >> sitemap.xml
           echo "<lastmod>$(date +%F)</lastmod>" >> sitemap.xml
           echo "</sitemap>" >> sitemap.xml
 
@@ -135,7 +144,6 @@ jobs:
 
       - name: Commit SEO updates
         run: |
-
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
 
@@ -145,21 +153,18 @@ jobs:
             echo "No SEO changes"
           else
             git commit -m "SEO: ultra enterprise automation"
-
             git pull --rebase
             git push
           fi
 
       - name: Ping search engines
         run: |
-
           curl -s "https://www.google.com/ping?sitemap=https://dmc.variouscd.com/sitemap.xml"
           curl -s "https://www.bing.com/ping?sitemap=https://dmc.variouscd.com/sitemap.xml"
           curl -s "https://yandex.com/ping?sitemap=https://dmc.variouscd.com/sitemap.xml"
 
       - name: IndexNow submission
         run: |
-
           curl -X POST "https://api.indexnow.org/indexnow" \
           -H "Content-Type: application/json; charset=utf-8" \
           -d '{
