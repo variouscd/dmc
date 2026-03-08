@@ -85,7 +85,6 @@ h1, h2, h3, p, a {
 	padding:15px 25px;
 	border-radius:25px;
 	text-decoration:none;
-	#border:none;
 	margin-top:50px;
 	margin-bottom:5px;
 	cursor:pointer;
@@ -1376,3 +1375,4 @@ h2.title:after{
   font-size: 1.6rem;
   font-weight: 600;
 }
+
