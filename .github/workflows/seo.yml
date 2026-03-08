@@ -1,0 +1,64 @@
+name: SEO Automation
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "0 3 * * *"
+
+jobs:
+  seo:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate sitemap
+        run: |
+          DOMAIN="https://dmc.variouscd.com"
+
+          echo '<?xml version="1.0" encoding="UTF-8"?>' > sitemap.xml
+          echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> sitemap.xml
+
+          for file in $(find . -name "*.html"); do
+            url=$(echo $file | sed 's|./||' | sed 's|index.html||')
+            echo "<url><loc>$DOMAIN/$url</loc></url>" >> sitemap.xml
+          done
+
+          echo '</urlset>' >> sitemap.xml
+
+      - name: Generate robots.txt
+        run: |
+          DOMAIN="https://dmc.variouscd.com"
+
+          echo "User-agent: *" > robots.txt
+          echo "Allow: /" >> robots.txt
+          echo "Sitemap: $DOMAIN/sitemap.xml" >> robots.txt
+
+      - name: Generate RSS
+        run: |
+          DOMAIN="https://dmc.variouscd.com"
+
+          echo '<?xml version="1.0" encoding="UTF-8"?>' > feed.xml
+          echo '<rss version="2.0"><channel>' >> feed.xml
+          echo "<title>Site Updates</title>" >> feed.xml
+          echo "<link>$DOMAIN</link>" >> feed.xml
+          echo "<description>Latest updates</description>" >> feed.xml
+
+          for file in $(find . -name "*.html"); do
+            url=$(echo $file | sed 's|./||')
+            echo "<item><title>$url</title><link>$DOMAIN/$url</link></item>" >> feed.xml
+          done
+
+          echo '</channel></rss>' >> feed.xml
+
+      - name: Commit files
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+
+          git add sitemap.xml robots.txt feed.xml
+          git commit -m "Auto SEO update" || echo "No changes"
+          git push
