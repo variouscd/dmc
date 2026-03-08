@@ -38,11 +38,16 @@ jobs:
 
           find . -type f -name "*.html" \
           -not -path "./.github/*" \
-          -not -name "404.html" \
           -not -path "./seo/*" \
+          -not -path "./node_modules/*" \
+          -not -path "./.git/*" \
+          -not -name "404.html" \
+          -not -path "*page/*" \
           | sort -u | while read file; do
 
             url=$(echo "$file" | sed 's|^\./||' | sed 's|index.html||')
+            url=$(echo "$url" | sed 's|//|/|g')
+
             LASTMOD=$(git log -1 --format="%cI" "$file" | cut -d'T' -f1)
 
             if [ -z "$LASTMOD" ]; then
@@ -66,6 +71,10 @@ jobs:
 
           echo "</urlset>" >> seo/sitemap-pages.xml
 
+      - name: Compress sitemap
+        run: |
+          gzip -kf seo/sitemap-pages.xml
+
       - name: Create sitemap index
         run: |
 
@@ -75,19 +84,14 @@ jobs:
           echo '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> sitemap.xml
 
           echo "<sitemap>" >> sitemap.xml
-          echo "<loc>${DOMAIN}/seo/sitemap-pages.xml</loc>" >> sitemap.xml
+          echo "<loc>${DOMAIN}/seo/sitemap-pages.xml.gz</loc>" >> sitemap.xml
           echo "<lastmod>$(date +%F)</lastmod>" >> sitemap.xml
           echo "</sitemap>" >> sitemap.xml
 
           echo "</sitemapindex>" >> sitemap.xml
 
-      - name: Compress sitemap
-        run: |
-          gzip -k -f seo/sitemap-pages.xml
-
       - name: Generate robots.txt
         run: |
-
           echo "User-agent: *" > robots.txt
           echo "Allow: /" >> robots.txt
           echo "" >> robots.txt
