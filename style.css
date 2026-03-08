@@ -99,7 +99,7 @@ h1, h2, h3, p, a {
 
 .categories-intro{
     text-align:center;
-    margin:60px auto 40px;
+    margin:25px auto 40px;
 }
 
 .intro{
@@ -1375,6 +1375,7 @@ h2.title:after{
   font-size: 1.6rem;
   font-weight: 600;
 }
+
 
 
 
