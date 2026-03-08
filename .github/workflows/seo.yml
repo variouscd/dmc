@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 jobs:
-  sitemap:
+  seo:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,28 +20,44 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate sitemap
+      - name: Generate clean sitemap
         run: |
+
           DOMAIN="https://dmc.variouscd.com"
+          TODAY=$(date +%F)
 
           echo '<?xml version="1.0" encoding="UTF-8"?>' > sitemap.xml
           echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> sitemap.xml
 
-          find . -type f -name "*.html" ! -path "./.github/*" | while read file; do
+          find . -type f -name "*.html" \
+          ! -path "./.github/*" \
+          ! -name "404.html" \
+          ! -path "*page/*" \
+          | sort -u | while read file; do
+
             url=$(echo "$file" | sed 's|^\./||' | sed 's|index.html||')
 
             echo "<url>" >> sitemap.xml
             echo "<loc>${DOMAIN}/${url}</loc>" >> sitemap.xml
-            echo "<lastmod>$(date +%F)</lastmod>" >> sitemap.xml
+            echo "<lastmod>${TODAY}</lastmod>" >> sitemap.xml
+            echo "<changefreq>weekly</changefreq>" >> sitemap.xml
+            echo "<priority>0.8</priority>" >> sitemap.xml
             echo "</url>" >> sitemap.xml
+
           done
 
           echo "</urlset>" >> sitemap.xml
 
-      - name: Commit sitemap
+      - name: Commit sitemap if changed
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
+
           git add sitemap.xml
-          git commit -m "Update sitemap" || echo "No changes"
+          git diff --cached --quiet || git commit -m "Auto update sitemap"
           git push
+
+      - name: Ping search engines
+        run: |
+          curl "https://www.google.com/ping?sitemap=https://dmc.variouscd.com/sitemap.xml"
+          curl "https://www.bing.com/ping?sitemap=https://dmc.variouscd.com/sitemap.xml"
