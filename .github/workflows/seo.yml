@@ -1,11 +1,9 @@
-name: Ultra Enterprise SEO Automation
+name: SEO Automation
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
   schedule:
-    - cron: "0 2 * * *"
+    - cron: "0 3 * * *"
 
 permissions:
   contents: write
@@ -18,159 +16,91 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Install SEO tools
+      - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            xmlstarlet \
-            linkchecker \
-            curl \
-            gzip \
-            parallel
+          sudo apt-get install -y curl gzip xmllint
 
-      - name: Generate sitemap pages
+      - name: Create SEO folder
+        run: mkdir -p seo
+
+      - name: Collect URLs
         run: |
           DOMAIN="https://dmc.variouscd.com"
 
-          mkdir -p seo
+          curl -s $DOMAIN/sitemap.xml \
+          | grep -oP '(?<=<loc>).*?(?=</loc>)' \
+          | grep "$DOMAIN" \
+          > urls.txt
+
+      - name: Generate sitemap
+        run: |
+          TODAY=$(date +%F)
 
           echo '<?xml version="1.0" encoding="UTF-8"?>' > seo/sitemap-pages.xml
           echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> seo/sitemap-pages.xml
 
-          echo "<url>" >> seo/sitemap-pages.xml
-          echo "<loc>${DOMAIN}/</loc>" >> seo/sitemap-pages.xml
-          echo "<lastmod>$(date +%F)</lastmod>" >> seo/sitemap-pages.xml
-          echo "<changefreq>daily</changefreq>" >> seo/sitemap-pages.xml
-          echo "<priority>1.0</priority>" >> seo/sitemap-pages.xml
-          echo "</url>" >> seo/sitemap-pages.xml
+          while read url; do
 
-          find . -type f -name "*.html" \
-          -not -path "./.github/*" \
-          -not -path "./seo/*" \
-          -not -path "./node_modules/*" \
-          -not -path "./.git/*" \
-          -not -name "404.html" \
-          | sort -u | while read file; do
-
-            url=$(echo "$file" | sed 's|^\./||')
-            url=$(echo "$url" | sed 's|index.html||')
-            url=$(echo "$url" | sed 's|//|/|g')
-
-            if [ -z "$url" ]; then
-              continue
-            fi
-
-            loc="${DOMAIN}/${url}"
-            loc=$(echo "$loc" | tr -d '\n' | tr -d '\r')
-            loc=$(echo "$loc" | sed 's|://|TEMP|g' | sed 's|//|/|g' | sed 's|TEMP|://|g')
-            loc=$(printf '%s\n' "$loc" | sed 's/ /%20/g')
-
-            LASTMOD=$(git log -1 --format="%cI" "$file" 2>/dev/null | cut -d'T' -f1)
-
-            if [ -z "$LASTMOD" ]; then
-              LASTMOD=$(date +%F)
-            fi
-
-            DEPTH=$(echo "$url" | awk -F"/" '{print NF}')
-
-            if [ "$DEPTH" -le 2 ]; then
-              PRIORITY="0.9"
-              CHANGEFREQ="weekly"
-            elif [ "$DEPTH" -le 3 ]; then
-              PRIORITY="0.8"
-              CHANGEFREQ="weekly"
-            else
-              PRIORITY="0.7"
-              CHANGEFREQ="monthly"
-            fi
+            CLEAN=$(echo "$url" | tr -d '\n\r\t')
 
             echo "<url>" >> seo/sitemap-pages.xml
-            echo "<loc>${loc}</loc>" >> seo/sitemap-pages.xml
-            echo "<lastmod>${LASTMOD}</lastmod>" >> seo/sitemap-pages.xml
-            echo "<changefreq>${CHANGEFREQ}</changefreq>" >> seo/sitemap-pages.xml
-            echo "<priority>${PRIORITY}</priority>" >> seo/sitemap-pages.xml
+            echo "<loc>$CLEAN</loc>" >> seo/sitemap-pages.xml
+            echo "<lastmod>$TODAY</lastmod>" >> seo/sitemap-pages.xml
+            echo "<changefreq>weekly</changefreq>" >> seo/sitemap-pages.xml
+            echo "<priority>0.8</priority>" >> seo/sitemap-pages.xml
             echo "</url>" >> seo/sitemap-pages.xml
 
-          done
+          done < urls.txt
 
           echo "</urlset>" >> seo/sitemap-pages.xml
 
-      - name: Validate XML sitemap
-        run: |
-          xmlstarlet val -e seo/sitemap-pages.xml || true
+      - name: Validate sitemap XML
+        run: xmllint --noout seo/sitemap-pages.xml
 
       - name: Compress sitemap
-        run: |
-          gzip -kf seo/sitemap-pages.xml
+        run: gzip -f seo/sitemap-pages.xml
 
       - name: Create sitemap index
         run: |
           DOMAIN="https://dmc.variouscd.com"
+          TODAY=$(date +%F)
 
-          echo '<?xml version="1.0" encoding="UTF-8"?>' > sitemap.xml
-          echo '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> sitemap.xml
-
-          echo "<sitemap>" >> sitemap.xml
-          echo "<loc>${DOMAIN}/seo/sitemap-pages.xml</loc>" >> sitemap.xml
-          echo "<lastmod>$(date +%F)</lastmod>" >> sitemap.xml
-          echo "</sitemap>" >> sitemap.xml
-
-          echo "</sitemapindex>" >> sitemap.xml
+          cat <<EOF > sitemap.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<sitemap>
+<loc>${DOMAIN}/seo/sitemap-pages.xml.gz</loc>
+<lastmod>${TODAY}</lastmod>
+</sitemap>
+</sitemapindex>
+EOF
 
       - name: Generate robots.txt
         run: |
+          DOMAIN="https://dmc.variouscd.com"
+
           echo "User-agent: *" > robots.txt
           echo "Allow: /" >> robots.txt
           echo "" >> robots.txt
-          echo "Sitemap: https://dmc.variouscd.com/sitemap.xml" >> robots.txt
+          echo "Sitemap: ${DOMAIN}/sitemap.xml" >> robots.txt
 
-      - name: HTTP status check
+      - name: Commit changes
         run: |
-          grep "<loc>" seo/sitemap-pages.xml \
-          | sed 's|<loc>||g' \
-          | sed 's|</loc>||g' \
-          | parallel -j20 curl -o /dev/null -s -w "%{http_code} %{url_effective}\n" || true
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
 
-      - name: Broken link crawler
-        run: |
-          linkchecker https://dmc.variouscd.com \
-          --ignore-url=mailto \
-          --ignore-url=tel \
-          --check-extern \
-          --no-warnings || true
+          git add sitemap.xml robots.txt seo/
 
-      - name: Commit SEO updates
-        run: |
-            git config --global user.name "github-actions"
-            git config --global user.email "actions@github.com"
-
-            git add sitemap.xml seo robots.txt
-
-            if git diff --cached --quiet; then
-              echo "No SEO changes"
-            else
-              git commit -m "SEO: ultra enterprise automation"
-              git pull --rebase origin main || true
-              git push
-            fi
+          if git diff --cached --quiet; then
+            echo "No SEO changes"
+          else
+            git commit -m "SEO: automatic sitemap update"
+            git push
+          fi
 
       - name: Ping search engines
         run: |
           curl -s "https://www.google.com/ping?sitemap=https://dmc.variouscd.com/sitemap.xml" || true
           curl -s "https://www.bing.com/ping?sitemap=https://dmc.variouscd.com/sitemap.xml" || true
-          curl -s "https://yandex.com/ping?sitemap=https://dmc.variouscd.com/sitemap.xml" || true
-
-      - name: IndexNow submission
-        run: |
-          curl -X POST "https://api.indexnow.org/indexnow" \
-          -H "Content-Type: application/json; charset=utf-8" \
-          -d '{
-            "host": "dmc.variouscd.com",
-            "key": "example-key",
-            "urlList": [
-              "https://dmc.variouscd.com/"
-            ]
-          }'
