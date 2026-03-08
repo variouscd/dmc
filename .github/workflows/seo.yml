@@ -1,11 +1,11 @@
-name: SEO Automation
+name: Enterprise SEO Automation
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
   schedule:
-    - cron: "0 3 * * *"
+    - cron: "0 2 * * *"
 
 permissions:
   contents: write
@@ -21,21 +21,28 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Generate SEO sitemap
+      - name: Install SEO tools
         run: |
+          sudo apt-get update
+          sudo apt-get install -y xmlstarlet linkchecker gzip
+
+      - name: Generate sitemap pages
+        run: |
+
           DOMAIN="https://dmc.variouscd.com"
 
-          echo '<?xml version="1.0" encoding="UTF-8"?>' > sitemap.xml
-          echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> sitemap.xml
+          mkdir -p seo
+
+          echo '<?xml version="1.0" encoding="UTF-8"?>' > seo/sitemap-pages.xml
+          echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> seo/sitemap-pages.xml
 
           find . -type f -name "*.html" \
           -not -path "./.github/*" \
           -not -name "404.html" \
-          -not -name "sitemap*.xml" \
+          -not -path "./seo/*" \
           | sort -u | while read file; do
 
             url=$(echo "$file" | sed 's|^\./||' | sed 's|index.html||')
-
             LASTMOD=$(git log -1 --format="%cI" "$file" | cut -d'T' -f1)
 
             if [ -z "$LASTMOD" ]; then
@@ -48,39 +55,69 @@ jobs:
               PRIORITY="0.7"
             fi
 
-            echo "<url>" >> sitemap.xml
-            echo "<loc>${DOMAIN}/${url}</loc>" >> sitemap.xml
-            echo "<lastmod>${LASTMOD}</lastmod>" >> sitemap.xml
-            echo "<changefreq>weekly</changefreq>" >> sitemap.xml
-            echo "<priority>${PRIORITY}</priority>" >> sitemap.xml
-            echo "</url>" >> sitemap.xml
+            echo "<url>" >> seo/sitemap-pages.xml
+            echo "<loc>${DOMAIN}/${url}</loc>" >> seo/sitemap-pages.xml
+            echo "<lastmod>${LASTMOD}</lastmod>" >> seo/sitemap-pages.xml
+            echo "<changefreq>weekly</changefreq>" >> seo/sitemap-pages.xml
+            echo "<priority>${PRIORITY}</priority>" >> seo/sitemap-pages.xml
+            echo "</url>" >> seo/sitemap-pages.xml
 
           done
 
-          echo "</urlset>" >> sitemap.xml
+          echo "</urlset>" >> seo/sitemap-pages.xml
+
+      - name: Create sitemap index
+        run: |
+
+          DOMAIN="https://dmc.variouscd.com"
+
+          echo '<?xml version="1.0" encoding="UTF-8"?>' > sitemap.xml
+          echo '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> sitemap.xml
+
+          echo "<sitemap>" >> sitemap.xml
+          echo "<loc>${DOMAIN}/seo/sitemap-pages.xml</loc>" >> sitemap.xml
+          echo "<lastmod>$(date +%F)</lastmod>" >> sitemap.xml
+          echo "</sitemap>" >> sitemap.xml
+
+          echo "</sitemapindex>" >> sitemap.xml
+
+      - name: Compress sitemap
+        run: |
+          gzip -k -f seo/sitemap-pages.xml
 
       - name: Generate robots.txt
         run: |
+
           echo "User-agent: *" > robots.txt
           echo "Allow: /" >> robots.txt
           echo "" >> robots.txt
           echo "Sitemap: https://dmc.variouscd.com/sitemap.xml" >> robots.txt
 
+      - name: Check broken links
+        run: |
+          linkchecker https://dmc.variouscd.com \
+          --ignore-url=mailto \
+          --ignore-url=tel \
+          --check-extern \
+          --no-warnings || true
+
       - name: Commit SEO updates
         run: |
+
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
 
-          git add sitemap.xml robots.txt
+          git add sitemap.xml seo robots.txt
 
           if git diff --cached --quiet; then
             echo "No SEO changes"
           else
-            git commit -m "SEO: auto update sitemap and robots"
+            git commit -m "SEO: enterprise automation update"
             git push
           fi
 
       - name: Ping search engines
         run: |
+
           curl -s "https://www.google.com/ping?sitemap=https://dmc.variouscd.com/sitemap.xml"
           curl -s "https://www.bing.com/ping?sitemap=https://dmc.variouscd.com/sitemap.xml"
