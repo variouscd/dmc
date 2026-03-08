@@ -1034,6 +1034,7 @@ ul{
   max-width: 1200px;
   margin: 0 auto;
   display: block;
+  margin-top:25px;
 }
 
 .service-container{
@@ -1375,6 +1376,7 @@ h2.title:after{
   font-size: 1.6rem;
   font-weight: 600;
 }
+
 
 
 
