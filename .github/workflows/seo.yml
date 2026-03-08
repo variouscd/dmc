@@ -1,0 +1,38 @@
+name: SEO Automation
+
+on:
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: "0 3 * * *"
+
+jobs:
+  sitemap:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Generate sitemap
+        run: |
+          echo '<?xml version="1.0" encoding="UTF-8"?>' > sitemap.xml
+          echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> sitemap.xml
+
+          for file in $(find . -name "*.html"); do
+            url=$(echo $file | sed 's|./||' | sed 's|index.html||')
+            echo "<url>" >> sitemap.xml
+            echo "<loc>https://dmc.variouscd.com/$url</loc>" >> sitemap.xml
+            echo "<lastmod>$(date +%F)</lastmod>" >> sitemap.xml
+            echo "</url>" >> sitemap.xml
+          done
+
+          echo '</urlset>' >> sitemap.xml
+
+      - name: Commit sitemap
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+          git add sitemap.xml
+          git commit -m "Auto update sitemap" || echo "No changes"
+          git push
