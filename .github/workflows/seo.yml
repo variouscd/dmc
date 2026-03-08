@@ -29,9 +29,19 @@ jobs:
           DOMAIN="https://dmc.variouscd.com"
 
           curl -s $DOMAIN/sitemap.xml \
-          | grep -oP '(?<=<loc>).*?(?=</loc>)' \
+          | sed -n 's:.*<loc>\(.*\)</loc>.*:\1:p' \
           | grep "$DOMAIN" \
-          > urls.txt
+          | sort -u > urls.txt
+
+          echo "Collected URLs:"
+          wc -l urls.txt
+
+      - name: Check URLs list
+        run: |
+          if [ ! -s urls.txt ]; then
+            echo "ERROR: urls.txt is empty"
+            exit 1
+          fi
 
       - name: Generate sitemap
         run: |
