@@ -26,10 +26,17 @@ xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
 
 pages.forEach(page => {
 
-  let url = page.replace("./", "").replace("index.html", "").replace(".html","");
+  const stats = fs.statSync(page);
+  const lastmod = stats.mtime.toISOString().split("T")[0];
+
+  let url = page
+    .replace("./", "")
+    .replace("index.html", "")
+    .replace(".html", "");
 
   xml += `<url>\n`;
   xml += `<loc>${domain}/${url}</loc>\n`;
+  xml += `<lastmod>${lastmod}</lastmod>\n`;
   xml += `</url>\n`;
 
 });
@@ -38,4 +45,4 @@ xml += `</urlset>`;
 
 fs.writeFileSync("sitemap.xml", xml);
 
-console.log("Sitemap generated");
+console.log("Smart sitemap generated");
