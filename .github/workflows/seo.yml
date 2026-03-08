@@ -25,11 +25,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-          xmlstarlet \
-          linkchecker \
-          curl \
-          gzip \
-          parallel
+            xmlstarlet \
+            linkchecker \
+            curl \
+            gzip \
+            parallel
 
       - name: Generate sitemap pages
         run: |
@@ -52,8 +52,13 @@ jobs:
             url=$(echo "$file" | sed 's|^\./||' | sed 's|index.html||')
             url=$(echo "$url" | sed 's|//|/|g')
 
+            if [ -z "$url" ]; then
+              continue
+            fi
+
             loc="${DOMAIN}/${url}"
-            loc=$(echo "$loc" | sed 's|//|/|g' | sed 's|:/|://|')
+
+            loc=$(echo "$loc" | sed 's|://|TEMP|g' | sed 's|//|/|g' | sed 's|TEMP|://|g')
 
             LASTMOD=$(git log -1 --format="%cI" "$file" | cut -d'T' -f1)
 
@@ -74,7 +79,7 @@ jobs:
 
             echo "<url>" >> seo/sitemap-pages.xml
             echo "<loc>${loc}</loc>" >> seo/sitemap-pages.xml
-            echo "<lastmod>${LASTMOD}</lastmod>" >> seo/sitemap-pages.xmlф
+            echo "<lastmod>${LASTMOD}</lastmod>" >> seo/sitemap-pages.xml
             echo "<changefreq>${CHANGEFREQ}</changefreq>" >> seo/sitemap-pages.xml
             echo "<priority>${PRIORITY}</priority>" >> seo/sitemap-pages.xml
             echo "</url>" >> seo/sitemap-pages.xml
@@ -115,10 +120,10 @@ jobs:
 
       - name: HTTP status check
         run: |
-          cat seo/sitemap-pages.xml | \
-          grep "<loc>" | \
-          sed 's|<loc>||g' | sed 's|</loc>||g' | \
-          parallel -j20 curl -o /dev/null -s -w "%{http_code} %{url_effective}\n"
+          grep "<loc>" seo/sitemap-pages.xml \
+          | sed 's|<loc>||g' \
+          | sed 's|</loc>||g' \
+          | parallel -j20 curl -o /dev/null -s -w "%{http_code} %{url_effective}\n"
 
       - name: Broken link crawler
         run: |
@@ -140,6 +145,8 @@ jobs:
             echo "No SEO changes"
           else
             git commit -m "SEO: ultra enterprise automation"
+
+            git pull --rebase
             git push
           fi
 
