@@ -29,6 +29,8 @@ jobs:
           curl -s $DOMAIN/sitemap.xml \
           | grep "<loc>" \
           | sed -E 's/.*<loc>(.*)<\/loc>.*/\1/' \
+          | grep -v "404.html" \
+          | grep -v "/page/" \
           | tr -d '\r' \
           | sort -u \
           > urls.txt
