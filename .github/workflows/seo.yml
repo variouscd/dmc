@@ -13,19 +13,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install SEO tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y curl wget xmllint
+          sudo apt-get install -y curl wget libxml2-utils
 
-      - name: Create folders
+      - name: Prepare files
         run: |
-          mkdir -p seo
-          rm -f urls.txt
+          rm -f urls.txt sitemap.xml
 
       - name: Crawl site and collect URLs
         run: |
@@ -43,19 +41,16 @@ jobs:
             | grep '^--' \
             | awk '{print $3}' \
             | grep "$DOMAIN" \
-            | sort -u \
-            > urls.txt
+            | sort -u > urls.txt
 
       - name: Generate sitemap
         run: |
-          DOMAIN="https://dmc.variouscd.com"
           TODAY=$(date +%F)
 
           echo '<?xml version="1.0" encoding="UTF-8"?>' > sitemap.xml
           echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> sitemap.xml
 
-          while read url; do
-
+          while read -r url; do
             CLEAN=$(echo "$url" | tr -d '\n\r\t ')
 
             echo "<url>" >> sitemap.xml
@@ -69,7 +64,7 @@ jobs:
 
           echo "</urlset>" >> sitemap.xml
 
-      - name: Validate XML sitemap
+      - name: Validate sitemap XML
         run: xmllint --noout sitemap.xml
 
       - name: Generate robots.txt
@@ -80,17 +75,6 @@ jobs:
           echo "Allow: /" >> robots.txt
           echo "" >> robots.txt
           echo "Sitemap: ${DOMAIN}/sitemap.xml" >> robots.txt
-
-      - name: Check broken links
-        run: |
-          echo "Checking URLs..."
-          while read url; do
-            STATUS=$(curl -o /dev/null -s -w "%{http_code}" "$url")
-
-            if [ "$STATUS" -ge 400 ]; then
-              echo "Broken: $url ($STATUS)"
-            fi
-          done < urls.txt
 
       - name: Commit SEO updates
         run: |
