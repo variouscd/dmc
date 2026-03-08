@@ -1,4 +1,4 @@
-name: SEO Automation v12
+name: SEO Automation Stable
 
 on:
   workflow_dispatch:
@@ -13,35 +13,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install SEO tools
+      - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y curl wget libxml2-utils
+          sudo apt-get install -y curl libxml2-utils
 
-      - name: Prepare files
-        run: |
-          rm -f urls.txt sitemap.xml
-
-      - name: Crawl site and collect URLs
+      - name: Collect URLs
         run: |
           DOMAIN="https://dmc.variouscd.com"
 
-          wget \
-            --recursive \
-            --level=5 \
-            --no-clobber \
-            --no-parent \
-            --spider \
-            --quiet \
-            --domains dmc.variouscd.com \
-            $DOMAIN 2>&1 \
-            | grep '^--' \
-            | awk '{print $3}' \
-            | grep "$DOMAIN" \
-            | sort -u > urls.txt
+          curl -s $DOMAIN/sitemap.xml \
+          | grep "<loc>" \
+          | sed -E 's/.*<loc>(.*)<\/loc>.*/\1/' \
+          | tr -d '\r' \
+          | sort -u \
+          > urls.txt
 
       - name: Generate sitemap
         run: |
@@ -51,20 +41,17 @@ jobs:
           echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> sitemap.xml
 
           while read -r url; do
-            CLEAN=$(echo "$url" | tr -d '\n\r\t ')
-
             echo "<url>" >> sitemap.xml
-            echo "<loc>$CLEAN</loc>" >> sitemap.xml
-            echo "<lastmod>$TODAY</lastmod>" >> sitemap.xml
+            echo "<loc>${url}</loc>" >> sitemap.xml
+            echo "<lastmod>${TODAY}</lastmod>" >> sitemap.xml
             echo "<changefreq>weekly</changefreq>" >> sitemap.xml
             echo "<priority>0.8</priority>" >> sitemap.xml
             echo "</url>" >> sitemap.xml
-
           done < urls.txt
 
           echo "</urlset>" >> sitemap.xml
 
-      - name: Validate sitemap XML
+      - name: Validate sitemap
         run: xmllint --noout sitemap.xml
 
       - name: Generate robots.txt
@@ -76,7 +63,7 @@ jobs:
           echo "" >> robots.txt
           echo "Sitemap: ${DOMAIN}/sitemap.xml" >> robots.txt
 
-      - name: Commit SEO updates
+      - name: Commit changes
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
@@ -84,9 +71,9 @@ jobs:
           git add sitemap.xml robots.txt
 
           if git diff --cached --quiet; then
-            echo "No SEO changes"
+            echo "No changes"
           else
-            git commit -m "SEO: automatic sitemap update"
+            git commit -m "SEO: update sitemap"
             git push
           fi
 
