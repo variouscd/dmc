@@ -23,11 +23,11 @@ h1, h2, h3, p, a {
 
 /* Hero Section*/
 .hero{
-	background-image:url("../img/background-image.png");
+	background-image:url("img/background-image.png");
 	background-repeat:no-repeat;
 	background-position:center;
 	background-size:cover;
-	padding:160px 0 0;
+	padding:550px 0 0;
 	text-align:center;
 	overflow:visible;
     position: relative;
@@ -96,6 +96,19 @@ h1, h2, h3, p, a {
 
 .cat-btn:hover{
 	background-color:#ff4e93;
+}
+
+.categories-intro{
+    text-align:center;
+    margin:60px auto 40px;
+}
+
+.intro{
+    max-width:820px;
+    margin:20px auto 0;
+    font-size:1.7rem;
+    line-height:1.8;
+    color:#666;
 }
 
 /* Product Section*/
@@ -1084,7 +1097,7 @@ h2.title {
   font-family: 'Roboto', sans-serif;
   font-size: 18px;
   font-weight: 700;
-  margin: 30px;
+  margin: 5px;
   text-transform: uppercase;
   
 }
@@ -1362,5 +1375,4 @@ h2.title:after{
   padding: 14px 36px;
   font-size: 1.6rem;
   font-weight: 600;
-
 }
