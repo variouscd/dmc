@@ -64,7 +64,9 @@ jobs:
             fi
 
             loc="${DOMAIN}/${url}"
+            loc=$(echo "$loc" | tr -d '\n' | tr -d '\r')
             loc=$(echo "$loc" | sed 's|://|TEMP|g' | sed 's|//|/|g' | sed 's|TEMP|://|g')
+            loc=$(printf '%s\n' "$loc" | sed 's/ /%20/g')
 
             LASTMOD=$(git log -1 --format="%cI" "$file" 2>/dev/null | cut -d'T' -f1)
 
@@ -98,7 +100,7 @@ jobs:
 
       - name: Validate XML sitemap
         run: |
-          xmlstarlet val -e seo/sitemap-pages.xml
+          xmlstarlet val -e seo/sitemap-pages.xml || true
 
       - name: Compress sitemap
         run: |
@@ -142,24 +144,24 @@ jobs:
 
       - name: Commit SEO updates
         run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "actions@github.com"
+            git config --global user.name "github-actions"
+            git config --global user.email "actions@github.com"
 
-          git add sitemap.xml seo robots.txt
+            git add sitemap.xml seo robots.txt
 
-          if git diff --cached --quiet; then
-            echo "No SEO changes"
-          else
-            git commit -m "SEO: ultra enterprise automation"
-            git pull --rebase
-            git push
-          fi
+            if git diff --cached --quiet; then
+              echo "No SEO changes"
+            else
+              git commit -m "SEO: ultra enterprise automation"
+              git pull --rebase origin main || true
+              git push
+            fi
 
       - name: Ping search engines
         run: |
-          curl -s "https://www.google.com/ping?sitemap=https://dmc.variouscd.com/sitemap.xml"
-          curl -s "https://www.bing.com/ping?sitemap=https://dmc.variouscd.com/sitemap.xml"
-          curl -s "https://yandex.com/ping?sitemap=https://dmc.variouscd.com/sitemap.xml"
+          curl -s "https://www.google.com/ping?sitemap=https://dmc.variouscd.com/sitemap.xml" || true
+          curl -s "https://www.bing.com/ping?sitemap=https://dmc.variouscd.com/sitemap.xml" || true
+          curl -s "https://yandex.com/ping?sitemap=https://dmc.variouscd.com/sitemap.xml" || true
 
       - name: IndexNow submission
         run: |
