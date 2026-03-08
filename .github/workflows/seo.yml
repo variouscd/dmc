@@ -13,14 +13,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y curl gzip xmllint
+          sudo apt-get install -y curl gzip libxml2-utils
 
       - name: Create SEO folder
         run: mkdir -p seo
@@ -42,7 +41,6 @@ jobs:
           echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> seo/sitemap-pages.xml
 
           while read url; do
-
             CLEAN=$(echo "$url" | tr -d '\n\r\t')
 
             echo "<url>" >> seo/sitemap-pages.xml
@@ -67,15 +65,13 @@ jobs:
           DOMAIN="https://dmc.variouscd.com"
           TODAY=$(date +%F)
 
-          cat <<EOF > sitemap.xml
-<?xml version="1.0" encoding="UTF-8"?>
-<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-<sitemap>
-<loc>${DOMAIN}/seo/sitemap-pages.xml.gz</loc>
-<lastmod>${TODAY}</lastmod>
-</sitemap>
-</sitemapindex>
-EOF
+          echo '<?xml version="1.0" encoding="UTF-8"?>' > sitemap.xml
+          echo '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> sitemap.xml
+          echo '<sitemap>' >> sitemap.xml
+          echo "<loc>${DOMAIN}/seo/sitemap-pages.xml.gz</loc>" >> sitemap.xml
+          echo "<lastmod>${TODAY}</lastmod>" >> sitemap.xml
+          echo '</sitemap>' >> sitemap.xml
+          echo '</sitemapindex>' >> sitemap.xml
 
       - name: Generate robots.txt
         run: |
