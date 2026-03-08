@@ -27,7 +27,7 @@ h1, h2, h3, p, a {
 	background-repeat:no-repeat;
 	background-position:center;
 	background-size:cover;
-	padding: 550px 0 0;
+	padding: 500px 0 0;
 	text-align:center;
 	overflow:visible;
     position: relative;
@@ -1375,6 +1375,7 @@ h2.title:after{
   font-size: 1.6rem;
   font-weight: 600;
 }
+
 
 
 
