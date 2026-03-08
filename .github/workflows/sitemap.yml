@@ -1,0 +1,28 @@
+name: Smart Sitemap
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  sitemap:
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 18
+
+    - name: Generate smart sitemap
+      run: node scripts/sitemap.js
+
+    - name: Commit sitemap
+      run: |
+        git config --global user.name "seo-bot"
+        git config --global user.email "bot@github.com"
+        git add sitemap.xml
+        git commit -m "Auto sitemap update" || echo "No changes"
+        git push
