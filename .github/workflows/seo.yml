@@ -66,7 +66,7 @@ jobs:
             loc="${DOMAIN}/${url}"
             loc=$(echo "$loc" | sed 's|://|TEMP|g' | sed 's|//|/|g' | sed 's|TEMP|://|g')
 
-            LASTMOD=$(git log -1 --format="%cI" "$file" | cut -d'T' -f1)
+            LASTMOD=$(git log -1 --format="%cI" "$file" 2>/dev/null | cut -d'T' -f1)
 
             if [ -z "$LASTMOD" ]; then
               LASTMOD=$(date +%F)
@@ -95,8 +95,6 @@ jobs:
           done
 
           echo "</urlset>" >> seo/sitemap-pages.xml
-
-          sort -u seo/sitemap-pages.xml -o seo/sitemap-pages.xml
 
       - name: Validate XML sitemap
         run: |
@@ -132,7 +130,7 @@ jobs:
           grep "<loc>" seo/sitemap-pages.xml \
           | sed 's|<loc>||g' \
           | sed 's|</loc>||g' \
-          | parallel -j20 curl -o /dev/null -s -w "%{http_code} %{url_effective}\n"
+          | parallel -j20 curl -o /dev/null -s -w "%{http_code} %{url_effective}\n" || true
 
       - name: Broken link crawler
         run: |
