@@ -27,7 +27,6 @@ jobs:
           sudo apt-get install -y \
           xmlstarlet \
           linkchecker \
-          pup \
           curl \
           gzip \
           parallel
@@ -75,7 +74,7 @@ jobs:
 
             echo "<url>" >> seo/sitemap-pages.xml
             echo "<loc>${loc}</loc>" >> seo/sitemap-pages.xml
-            echo "<lastmod>${LASTMOD}</lastmod>"
+            echo "<lastmod>${LASTMOD}</lastmod>" >> seo/sitemap-pages.xmlф
             echo "<changefreq>${CHANGEFREQ}</changefreq>" >> seo/sitemap-pages.xml
             echo "<priority>${PRIORITY}</priority>" >> seo/sitemap-pages.xml
             echo "</url>" >> seo/sitemap-pages.xml
