@@ -1,8 +1,4 @@
 User-agent: *
 Allow: /
 
-# crawl optimization
-Crawl-delay: 1
-
-# sitemaps
 Sitemap: https://dmc.variouscd.com/sitemap.xml
