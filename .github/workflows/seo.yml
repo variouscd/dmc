@@ -1,4 +1,4 @@
-name: Enterprise SEO Automation
+name: Ultra Enterprise SEO Automation
 
 on:
   push:
@@ -24,7 +24,13 @@ jobs:
       - name: Install SEO tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y xmlstarlet linkchecker gzip
+          sudo apt-get install -y \
+          xmlstarlet \
+          linkchecker \
+          pup \
+          curl \
+          gzip \
+          parallel
 
       - name: Generate sitemap pages
         run: |
@@ -42,11 +48,13 @@ jobs:
           -not -path "./node_modules/*" \
           -not -path "./.git/*" \
           -not -name "404.html" \
-          -not -path "*page/*" \
           | sort -u | while read file; do
 
             url=$(echo "$file" | sed 's|^\./||' | sed 's|index.html||')
             url=$(echo "$url" | sed 's|//|/|g')
+
+            loc="${DOMAIN}/${url}"
+            loc=$(echo "$loc" | sed 's|//|/|g' | sed 's|:/|://|')
 
             LASTMOD=$(git log -1 --format="%cI" "$file" | cut -d'T' -f1)
 
@@ -56,20 +64,29 @@ jobs:
 
             if [ "$url" = "" ]; then
               PRIORITY="1.0"
+              CHANGEFREQ="daily"
+            elif [[ "$url" == */ ]]; then
+              PRIORITY="0.8"
+              CHANGEFREQ="weekly"
             else
               PRIORITY="0.7"
+              CHANGEFREQ="monthly"
             fi
 
             echo "<url>" >> seo/sitemap-pages.xml
-            echo "<loc>${DOMAIN}/${url}</loc>" >> seo/sitemap-pages.xml
-            echo "<lastmod>${LASTMOD}</lastmod>" >> seo/sitemap-pages.xml
-            echo "<changefreq>weekly</changefreq>" >> seo/sitemap-pages.xml
+            echo "<loc>${loc}</loc>" >> seo/sitemap-pages.xml
+            echo "<lastmod>${LASTMOD}</lastmod>"
+            echo "<changefreq>${CHANGEFREQ}</changefreq>" >> seo/sitemap-pages.xml
             echo "<priority>${PRIORITY}</priority>" >> seo/sitemap-pages.xml
             echo "</url>" >> seo/sitemap-pages.xml
 
           done
 
           echo "</urlset>" >> seo/sitemap-pages.xml
+
+      - name: Validate XML sitemap
+        run: |
+          xmlstarlet val -e seo/sitemap-pages.xml
 
       - name: Compress sitemap
         run: |
@@ -97,7 +114,14 @@ jobs:
           echo "" >> robots.txt
           echo "Sitemap: https://dmc.variouscd.com/sitemap.xml" >> robots.txt
 
-      - name: Check broken links
+      - name: HTTP status check
+        run: |
+          cat seo/sitemap-pages.xml | \
+          grep "<loc>" | \
+          sed 's|<loc>||g' | sed 's|</loc>||g' | \
+          parallel -j20 curl -o /dev/null -s -w "%{http_code} %{url_effective}\n"
+
+      - name: Broken link crawler
         run: |
           linkchecker https://dmc.variouscd.com \
           --ignore-url=mailto \
@@ -116,7 +140,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No SEO changes"
           else
-            git commit -m "SEO: enterprise automation update"
+            git commit -m "SEO: ultra enterprise automation"
             git push
           fi
 
@@ -125,3 +149,17 @@ jobs:
 
           curl -s "https://www.google.com/ping?sitemap=https://dmc.variouscd.com/sitemap.xml"
           curl -s "https://www.bing.com/ping?sitemap=https://dmc.variouscd.com/sitemap.xml"
+          curl -s "https://yandex.com/ping?sitemap=https://dmc.variouscd.com/sitemap.xml"
+
+      - name: IndexNow submission
+        run: |
+
+          curl -X POST "https://api.indexnow.org/indexnow" \
+          -H "Content-Type: application/json; charset=utf-8" \
+          -d '{
+            "host": "dmc.variouscd.com",
+            "key": "example-key",
+            "urlList": [
+              "https://dmc.variouscd.com/"
+            ]
+          }'
