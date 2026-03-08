@@ -15,49 +15,72 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
-      - name: Generate clean sitemap
+      - name: Generate SEO sitemap
         run: |
-
           DOMAIN="https://dmc.variouscd.com"
-          TODAY=$(date +%F)
 
           echo '<?xml version="1.0" encoding="UTF-8"?>' > sitemap.xml
           echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> sitemap.xml
 
           find . -type f -name "*.html" \
-          ! -path "./.github/*" \
-          ! -name "404.html" \
-          ! -path "*page/*" \
+          -not -path "./.github/*" \
+          -not -name "404.html" \
+          -not -name "sitemap*.xml" \
           | sort -u | while read file; do
 
             url=$(echo "$file" | sed 's|^\./||' | sed 's|index.html||')
 
+            LASTMOD=$(git log -1 --format="%cI" "$file" | cut -d'T' -f1)
+
+            if [ -z "$LASTMOD" ]; then
+              LASTMOD=$(date +%F)
+            fi
+
+            if [ "$url" = "" ]; then
+              PRIORITY="1.0"
+            else
+              PRIORITY="0.7"
+            fi
+
             echo "<url>" >> sitemap.xml
             echo "<loc>${DOMAIN}/${url}</loc>" >> sitemap.xml
-            echo "<lastmod>${TODAY}</lastmod>" >> sitemap.xml
+            echo "<lastmod>${LASTMOD}</lastmod>" >> sitemap.xml
             echo "<changefreq>weekly</changefreq>" >> sitemap.xml
-            echo "<priority>0.8</priority>" >> sitemap.xml
+            echo "<priority>${PRIORITY}</priority>" >> sitemap.xml
             echo "</url>" >> sitemap.xml
 
           done
 
           echo "</urlset>" >> sitemap.xml
 
-      - name: Commit sitemap if changed
+      - name: Generate robots.txt
+        run: |
+          echo "User-agent: *" > robots.txt
+          echo "Allow: /" >> robots.txt
+          echo "" >> robots.txt
+          echo "Sitemap: https://dmc.variouscd.com/sitemap.xml" >> robots.txt
+
+      - name: Commit SEO updates
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
 
-          git add sitemap.xml
-          git diff --cached --quiet || git commit -m "Auto update sitemap"
-          git push
+          git add sitemap.xml robots.txt
+
+          if git diff --cached --quiet; then
+            echo "No SEO changes"
+          else
+            git commit -m "SEO: auto update sitemap and robots"
+            git push
+          fi
 
       - name: Ping search engines
         run: |
-          curl "https://www.google.com/ping?sitemap=https://dmc.variouscd.com/sitemap.xml"
-          curl "https://www.bing.com/ping?sitemap=https://dmc.variouscd.com/sitemap.xml"
+          curl -s "https://www.google.com/ping?sitemap=https://dmc.variouscd.com/sitemap.xml"
+          curl -s "https://www.bing.com/ping?sitemap=https://dmc.variouscd.com/sitemap.xml"
