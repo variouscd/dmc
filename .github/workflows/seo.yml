@@ -15,22 +15,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # Нужно для вытягивания реальных дат изменения файлов
 
       - name: Generate SEO Files
         run: |
           DOMAIN="https://dmc.variouscd.com"
+          KEY="3f4e8b7c2a"
           
           # 1. ГЕНЕРАЦИЯ SITEMAP
           echo '<?xml version="1.0" encoding="UTF-8"?>' > sitemap.xml
           echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> sitemap.xml
 
-          find . -name "index.html" | while read file; do
+          # Ищем все index.html, исключая папки пагинации
+          find . -name "index.html" | grep -v "/page/" | while read file; do
             path=$(echo "$file" | sed 's|^\./||' | sed 's|index.html$||')
             url="${DOMAIN}/${path}"
+            
+            # Очистка URL от двойных слэшей
             clean_url=$(echo "$url" | sed 's|[^:]//|/|g')
+            
+            # Дата последнего изменения из Git
             lastmod=$(git log -1 --format="%as" -- "$file")
             
+            # Приоритет: 1.0 для главной, 0.8 для остальных
             priority="0.8"
             if [ "$path" = "" ] || [ "$path" = "/" ]; then priority="1.0"; fi
 
@@ -41,6 +48,8 @@ jobs:
           # 2. ГЕНЕРАЦИЯ ROBOTS.TXT
           echo "User-agent: *" > robots.txt
           echo "Allow: /" >> robots.txt
+          # Запрещаем индексацию пагинации для роботов через robots.txt (дополнительная защита)
+          echo "Disallow: */page/*" >> robots.txt
           echo "" >> robots.txt
           echo "Sitemap: ${DOMAIN}/sitemap.xml" >> robots.txt
 
@@ -49,16 +58,14 @@ jobs:
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add sitemap.xml robots.txt
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update SEO files" && git push)
+          git diff --quiet && git diff --staged --quiet || (git commit -m "SEO: update sitemap (no pagination) & robots" && git push)
 
       - name: Send IndexNow Notification
         run: |
-          # Собираем список всех URL из sitemap в формате JSON массива
           DOMAIN="https://dmc.variouscd.com"
-          # Ключ IndexNow (должен совпадать с файлом в корне сайта)
-          KEY="3f4e8b7c2a" 
+          KEY="3f4e8b7c2a"
           
-          # Извлекаем все URL из созданного sitemap.xml
+          # Извлекаем только те URL, что попали в sitemap (уже без /page/)
           URL_LIST=$(grep -Po '(?<=<loc>)[^<]+' sitemap.xml | jq -R . | jq -s .)
 
           curl -X POST "https://api.indexnow.org/indexnow" \
@@ -68,4 +75,4 @@ jobs:
             \"key\": \"$KEY\",
             \"keyLocation\": \"${DOMAIN}/${KEY}.txt\",
             \"urlList\": $URL_LIST
-          }"
+          }" || true
