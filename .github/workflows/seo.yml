@@ -20,7 +20,25 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y curl
+          sudo apt-get install -y curl grep sed jq
+
+      - name: Crawl site
+        run: |
+          DOMAIN="https://dmc.variouscd.com"
+
+          curl -s $DOMAIN \
+          | grep -oP '(?<=href=")[^"]*' \
+          | grep "^/" \
+          | sed "s|^|$DOMAIN|" \
+          | sort -u > urls.txt
+
+          echo "$DOMAIN/" >> urls.txt
+
+          if [ ! -s urls.txt ]; then
+            echo "$DOMAIN/" > urls.txt
+          fi
+
+          sort -u urls.txt -o urls.txt
 
       - name: Generate sitemap
         run: |
@@ -30,12 +48,14 @@ jobs:
           echo '<?xml version="1.0" encoding="UTF-8"?>' > sitemap.xml
           echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> sitemap.xml
 
-          echo "<url>" >> sitemap.xml
-          echo "<loc>$DOMAIN/</loc>" >> sitemap.xml
-          echo "<lastmod>$TODAY</lastmod>" >> sitemap.xml
-          echo "<changefreq>daily</changefreq>" >> sitemap.xml
-          echo "<priority>1.0</priority>" >> sitemap.xml
-          echo "</url>" >> sitemap.xml
+          while read url; do
+            echo "<url>" >> sitemap.xml
+            echo "<loc>$url</loc>" >> sitemap.xml
+            echo "<lastmod>$TODAY</lastmod>" >> sitemap.xml
+            echo "<changefreq>weekly</changefreq>" >> sitemap.xml
+            echo "<priority>0.8</priority>" >> sitemap.xml
+            echo "</url>" >> sitemap.xml
+          done < urls.txt
 
           echo "</urlset>" >> sitemap.xml
 
@@ -53,7 +73,7 @@ jobs:
           git config --global user.name "seo-bot"
           git config --global user.email "seo-bot@github.com"
 
-          git add sitemap.xml robots.txt
+          git add sitemap.xml robots.txt urls.txt
 
           if git diff --cached --quiet; then
             echo "No changes"
@@ -66,18 +86,15 @@ jobs:
         run: |
           SITEMAP="https://dmc.variouscd.com/sitemap.xml"
 
-          curl -s "https://www.google.com/ping?sitemap=$SITEMAP" || true
           curl -s "https://www.bing.com/ping?sitemap=$SITEMAP" || true
           curl -s "https://www.bing.com/webmaster/ping.aspx?siteMap=$SITEMAP" || true
 
-      - name: IndexNow
-        run: |
+          URLS=$(jq -R . < urls.txt | jq -s .)
+
           curl -X POST "https://api.indexnow.org/indexnow" \
           -H "Content-Type: application/json" \
-          -d '{
-            "host": "dmc.variouscd.com",
-            "key": "3f4e8b7c2a",
-            "urlList": [
-              "https://dmc.variouscd.com/"
-            ]
-          }' || true
+          -d "{
+            \"host\": \"dmc.variouscd.com\",
+            \"key\": \"3f4e8b7c2a\",
+            \"urlList\": $URLS
+          }" || true
