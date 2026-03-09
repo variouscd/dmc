@@ -48,7 +48,8 @@ jobs:
             | sed 's/#.*//' \
             | grep -E '^/|^https://dmc.variouscd.com' \
             | sed "s|^/|$DOMAIN/|" \
-            | sed "s|//$|/|" \
+            | sed "s|$DOMAIN//|$DOMAIN/|" \
+            | tr -d '\r' \
             >> queue.txt
 
           done < current.txt
@@ -62,6 +63,8 @@ jobs:
         | grep -v '/tag/' \
         | grep -v '/author/' \
         | grep -v '/page/[0-9]\+/attachment' \
+        | grep -v "$DOMAIN$DOMAIN" \
+        | sed "s|$DOMAIN$DOMAIN|$DOMAIN|" \
         | sort -u > urls.txt
 
         echo "$DOMAIN/" >> urls.txt
