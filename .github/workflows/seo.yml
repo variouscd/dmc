@@ -1,19 +1,19 @@
 name: SEO Automation
 
 on:
-workflow_dispatch:
-schedule:
-- cron: "0 */6 * * *"
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */6 * * *"
 
 permissions:
-contents: write
+  contents: write
 
 jobs:
-seo:
-runs-on: ubuntu-latest
-
+  seo:
+    runs-on: ubuntu-latest
 
 steps:
+
   - name: Checkout repository
     uses: actions/checkout@v4
 
@@ -75,7 +75,6 @@ steps:
       echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> sitemap.xml
 
       while read url; do
-
         if [ "$url" = "$DOMAIN/" ]; then
           PRIORITY="1.0"
         else
@@ -88,7 +87,6 @@ steps:
         echo "<changefreq>weekly</changefreq>" >> sitemap.xml
         echo "<priority>$PRIORITY</priority>" >> sitemap.xml
         echo "</url>" >> sitemap.xml
-
       done < urls.txt
 
       echo "</urlset>" >> sitemap.xml
