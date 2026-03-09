@@ -137,4 +137,3 @@ steps:
         \"key\": \"3f4e8b7c2a\",
         \"urlList\": $URLS
       }" || true
-```
