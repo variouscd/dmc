@@ -40,6 +40,7 @@ jobs:
           grep -E '^--.*https://' wget.log \
           | awk '{print $3}' \
           | grep "^$DOMAIN" \
+          | grep -v '/page/' \
           | grep -vE '\.(png|jpg|jpeg|gif|svg|css|js|ico|pdf|zip)$' \
           | sort -u > urls.txt
 
