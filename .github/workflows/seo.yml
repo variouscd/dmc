@@ -12,8 +12,8 @@ jobs:
   seo:
     runs-on: ubuntu-latest
 
-
     steps:
+
     - name: Checkout repository
       uses: actions/checkout@v4
 
@@ -29,12 +29,16 @@ jobs:
         echo "$DOMAIN/" > queue.txt
         touch visited.txt
 
+        curl -s "$DOMAIN/feed/" \
+        | grep -Eo "$DOMAIN[^<]+" \
+        >> queue.txt
+
         for i in {1..50}; do
-        
+
           cp queue.txt current.txt
           > queue.txt
 
-          while read url; do
+          while read -r url; do
 
             if grep -qx "$url" visited.txt; then
               continue
@@ -65,6 +69,7 @@ jobs:
         | grep -v '/page/[0-9]\+/attachment' \
         | grep -v "$DOMAIN$DOMAIN" \
         | sed "s|$DOMAIN$DOMAIN|$DOMAIN|" \
+        | sed "s|$DOMAIN\([^/]\)|$DOMAIN/\1|" \
         | sort -u > urls.txt
 
         echo "$DOMAIN/" >> urls.txt
@@ -78,7 +83,8 @@ jobs:
         echo '<?xml version="1.0" encoding="UTF-8"?>' > sitemap.xml
         echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> sitemap.xml
 
-        while read url; do
+        while read -r url; do
+
           if [ "$url" = "$DOMAIN/" ]; then
             PRIORITY="1.0"
           else
@@ -91,6 +97,7 @@ jobs:
           echo "<changefreq>weekly</changefreq>" >> sitemap.xml
           echo "<priority>$PRIORITY</priority>" >> sitemap.xml
           echo "</url>" >> sitemap.xml
+
         done < urls.txt
 
         echo "</urlset>" >> sitemap.xml
