@@ -35,7 +35,7 @@ jobs:
           --domains dmc.variouscd.com \
           --no-parent \
           --output-file=wget.log \
-          $DOMAIN
+          $DOMAIN || true
 
           grep -E '^--.*https://' wget.log \
           | awk '{print $3}' \
