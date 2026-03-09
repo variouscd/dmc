@@ -26,19 +26,29 @@ jobs:
         run: |
           DOMAIN="https://dmc.variouscd.com"
 
-          wget --spider \
-          --recursive \
-          --level=5 \
-          --no-verbose \
-          --timeout=20 \
-          --tries=2 \
-          --domains dmc.variouscd.com \
-          --no-parent \
-          --output-file=wget.log \
-          $DOMAIN || true
+          echo "$DOMAIN" > queue.txt
+          echo "" > visited.txt
 
-          grep -E '^--.*https://' wget.log \
-          | awk '{print $3}' \
+          for i in {1..5}; do
+            while read url; do
+
+              if grep -q "$url" visited.txt; then
+                continue
+              fi
+
+              echo "$url" >> visited.txt
+
+              curl -s "$url" \
+              | grep -Eo 'href="[^"#]+"' \
+              | cut -d'"' -f2 \
+              | grep "^/" \
+              | sed "s|^|$DOMAIN|" \
+              >> queue.txt
+
+            done < queue.txt
+          done
+
+          cat queue.txt \
           | grep "^$DOMAIN" \
           | grep -v '/page/' \
           | grep -vE '\.(png|jpg|jpeg|gif|svg|css|js|ico|pdf|zip)$' \
