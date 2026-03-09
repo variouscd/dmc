@@ -1,113 +1,71 @@
-name: SEO Automation
+name: SEO Automation (Sitemap, Robots & IndexNow)
 
 on:
-  workflow_dispatch:
-  schedule:
-    - cron: "0 */6 * * *"
+  push:
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
-  seo:
+  seo-update:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Install tools
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y curl grep sed jq wget
+      - name: Generate SEO Files
+        run: |
+          DOMAIN="https://dmc.variouscd.com"
+          
+          # 1. ГЕНЕРАЦИЯ SITEMAP
+          echo '<?xml version="1.0" encoding="UTF-8"?>' > sitemap.xml
+          echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> sitemap.xml
 
-    - name: Crawl site
-      run: |
-        DOMAIN="https://dmc.variouscd.com"
-        echo "$DOMAIN/" > queue.txt
-        touch visited.txt
-        
-        # Получаем ссылки из фида для старта
-        curl -s "$DOMAIN/feed/" | grep -Eo "$DOMAIN[^<]+" >> queue.txt || true
+          find . -name "index.html" | while read file; do
+            path=$(echo "$file" | sed 's|^\./||' | sed 's|index.html$||')
+            url="${DOMAIN}/${path}"
+            clean_url=$(echo "$url" | sed 's|[^:]//|/|g')
+            lastmod=$(git log -1 --format="%as" -- "$file")
+            
+            priority="0.8"
+            if [ "$path" = "" ] || [ "$path" = "/" ]; then priority="1.0"; fi
 
-        # Цикл обхода (10 итераций обычно достаточно для небольшого сайта)
-        for i in {1..10}; do
-          if [ ! -s queue.txt ]; then break; fi
-          cp queue.txt current.txt
-          > queue.txt
+            echo "  <url><loc>$clean_url</loc><lastmod>$lastmod</lastmod><priority>$priority</priority></url>" >> sitemap.xml
+          done
+          echo '</urlset>' >> sitemap.xml
 
-          while read url; do
-            if grep -qx "$url" visited.txt; then continue; fi
-            echo "$url" >> visited.txt
+          # 2. ГЕНЕРАЦИЯ ROBOTS.TXT
+          echo "User-agent: *" > robots.txt
+          echo "Allow: /" >> robots.txt
+          echo "" >> robots.txt
+          echo "Sitemap: ${DOMAIN}/sitemap.xml" >> robots.txt
 
-            # Извлекаем ссылки, фильтруем только внутренние
-            curl -L -s "$url" \
-            | grep -Eo 'href="[^"#]+"' \
-            | cut -d'"' -f2 \
-            | sed 's/#.*//' \
-            | grep -E '^/|^https://dmc.variouscd.com' \
-            | sed "s|^/|$DOMAIN/|" \
-            | sed 's|https://dmc.variouscd.com//|https://dmc.variouscd.com/|g' \
-            | tr -d '\r' \
-            >> queue.txt
-          done < current.txt
-          sort -u queue.txt -o queue.txt
-        done
+      - name: Commit and Push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add sitemap.xml robots.txt
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update SEO files" && git push)
 
-        # Финальная очистка списка URL
-        cat visited.txt \
-        | grep "^$DOMAIN" \
-        | grep -vE '\.(png|jpg|jpeg|gif|svg|css|js|ico|pdf|zip|mp3|mp4)$' \
-        | grep -vE '/(tag|author|page|comments)/' \
-        | sed "s|variouscd.com\([^/]\)|variouscd.com/\1|g" \
-        | sed "s|variouscd.com//|variouscd.com/|g" \
-        | sort -u > urls.txt
+      - name: Send IndexNow Notification
+        run: |
+          # Собираем список всех URL из sitemap в формате JSON массива
+          DOMAIN="https://dmc.variouscd.com"
+          # Ключ IndexNow (должен совпадать с файлом в корне сайта)
+          KEY="3f4e8b7c2a" 
+          
+          # Извлекаем все URL из созданного sitemap.xml
+          URL_LIST=$(grep -Po '(?<=<loc>)[^<]+' sitemap.xml | jq -R . | jq -s .)
 
-    - name: Generate sitemap
-      run: |
-        DOMAIN="https://dmc.variouscd.com"
-        TODAY=$(date +%F)
-        echo '<?xml version="1.0" encoding="UTF-8"?>' > sitemap.xml
-        echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> sitemap.xml
-
-        while read url; do
-          PRIORITY="0.8"
-          if [ "$url" = "$DOMAIN/" ]; then PRIORITY="1.0"; fi
-
-          echo "<url><loc>$url</loc><lastmod>$TODAY</lastmod><changefreq>weekly</changefreq><priority>$PRIORITY</priority></url>" >> sitemap.xml
-        done < urls.txt
-        echo "</urlset>" >> sitemap.xml
-
-    - name: Generate robots.txt
-      run: |
-        echo "User-agent: *" > robots.txt
-        echo "Allow: /" >> robots.txt
-        echo "" >> robots.txt
-        echo "Sitemap: https://dmc.variouscd.com/sitemap.xml" >> robots.txt
-
-    - name: Commit changes
-      run: |
-        git config --global user.name "seo-bot"
-        git config --global user.email "seo-bot@github.com"
-        git add sitemap.xml robots.txt urls.txt
-        git commit -m "SEO auto update: $(date +%F)" || echo "No changes to commit"
-        git push || echo "No changes to push"
-
-    - name: Ping Search Engines
-      run: |
-        # Google Ping отключен официально, используем только Bing
-        SITEMAP="https://dmc.variouscd.com/sitemap.xml"
-        curl -s "https://www.bing.com/ping?sitemap=$SITEMAP" || true
-
-    - name: Send IndexNow
-      run: |
-        # Берем первые 100 уникальных ссылок
-        URLS=$(head -n 100 urls.txt | jq -R . | jq -s .)
-        curl -X POST "https://api.indexnow.org/indexnow" \
-        -H "Content-Type: application/json" \
-        -d "{
-          \"host\": \"dmc.variouscd.com\",
-          \"key\": \"3f4e8b7c2a\",
-          \"keyLocation\": \"https://dmc.variouscd.com/3f4e8b7c2a.txt\",
-          \"urlList\": $URLS
-        }" || true
+          curl -X POST "https://api.indexnow.org/indexnow" \
+          -H "Content-Type: application/json; charset=utf-8" \
+          -d "{
+            \"host\": \"dmc.variouscd.com\",
+            \"key\": \"$KEY\",
+            \"keyLocation\": \"${DOMAIN}/${KEY}.txt\",
+            \"urlList\": $URL_LIST
+          }"
