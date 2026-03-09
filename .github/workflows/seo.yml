@@ -56,13 +56,13 @@ jobs:
           echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' >> sitemap.xml
 
           while read url; do
-            
+
             if [ "$url" = "$DOMAIN/" ]; then
               PRIORITY="1.0"
             else
               PRIORITY="0.8"
             fi
-            
+
             echo "<url>" >> sitemap.xml
             echo "<loc>$url</loc>" >> sitemap.xml
             echo "<lastmod>$TODAY</lastmod>" >> sitemap.xml
@@ -96,17 +96,16 @@ jobs:
             git commit -m "SEO auto update"
             git push
           fi
-          
 
-      - name: Ping search engines
+      - name: Ping Bing
         run: |
           SITEMAP="https://dmc.variouscd.com/sitemap.xml"
 
           curl -s "https://www.bing.com/ping?sitemap=$SITEMAP" || true
-          curl -s "https://www.bing.com/webmaster/ping.aspx?siteMap=$SITEMAP" || true
-          curl "https://www.google.com/ping?sitemap=$SITEMAP" || true
 
-          URLS=$(jq -R . < urls.txt | jq -s .)
+      - name: Send IndexNow
+        run: |
+          URLS=$(head -n 100 urls.txt | jq -R . | jq -s .)
 
           curl -X POST "https://api.indexnow.org/indexnow" \
           -H "Content-Type: application/json" \
