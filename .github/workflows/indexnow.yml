@@ -1,0 +1,23 @@
+name: IndexNow Submit
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Submit URLs
+        run: |
+          curl -X POST "https://api.indexnow.org/indexnow" \
+          -H "Content-Type: application/json" \
+          -d '{
+          "host": "variouscd.com",
+          "key": "3f4e8b7c2a",
+          "urlList": [
+          "https://variouscd.com/",
+          "https://variouscd.com/page1",
+          "https://variouscd.com/page2"
+          ]}'
